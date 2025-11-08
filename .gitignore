@@ -1,0 +1,7 @@
+node_modules
+.env
+scripts/
+build/
+.react-router/
+.vscode/
+.DS_Store

@@ -1,0 +1,3107 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Hubble ERC-8004 Market Server",
+    "description": "Backend API for ERC-8004 Agent Marketplace",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/auth/challenge": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Get authentication challenge",
+        "description": "Get authentication challenge.\n\nClient provides wallet address and chain ID, server returns nonce and message to sign.\n\nArgs:\n    request: Authentication challenge request\n\nReturns:\n    Authentication challenge response with nonce and message to sign\n\nRaises:\n    HTTPException: If cache is full, returns 429 Too Many Requests",
+        "operationId": "create_challenge_api_v1_auth_challenge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthChallengeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthChallengeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Login",
+        "description": "User login.\n\nClient signs the challenge message with wallet private key and submits the signature for verification.\nReturns JWT access token upon successful verification.\n\nArgs:\n    request: Login request\n\nReturns:\n    Login response with JWT access token and user information\n\nRaises:\n    HTTPException: If signature verification fails",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthLoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "Get current user information",
+        "description": "Get current logged-in user profile.\n\nRequires valid JWT token in request header.\n\nArgs:\n    current_user: Current user (injected via dependency)\n\nReturns:\n    User profile response",
+        "operationId": "get_current_user_profile_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents": {
+      "post": {
+        "tags": ["Agents"],
+        "summary": "Create Agent",
+        "description": "Create a new Agent.\n\nRequires authentication. Only draft status Agents can be created, which can be published to chain later via the publish endpoint.\n\nArgs:\n    request: Agent creation request\n    current_user: Current user (via dependency injection)\n\nReturns:\n    Created Agent ID\n\nRaises:\n    HTTPException: If LLM Provider or DataSource does not exist",
+        "operationId": "create_agent_api_v1_agents_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IDResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Agents"],
+        "summary": "Query Agent List",
+        "description": "Query Agent list (supports pagination and filtering).\n\nNo authentication required, but unauthenticated users can only see published Agents.\nAuthenticated users can see all their own Agents and published Agents from others.\n\nArgs:\n    pagination: Pagination parameters\n    is_published: Whether published (optional)\n    owner_id: Owner ID (optional)\n    llm_provider_id: LLM Provider ID (optional)\n    search: Search keyword (optional)\n    current_user: Current user (optional, via dependency injection)\n\nReturns:\n    Agent list response\n\nRaises:\n    HTTPException: If unauthenticated user tries to query Agents of a specific owner",
+        "operationId": "list_agents_api_v1_agents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "is_published",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Whether published",
+              "title": "Is Published"
+            },
+            "description": "Whether published"
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Owner ID",
+              "title": "Owner Id"
+            },
+            "description": "Owner ID"
+          },
+          {
+            "name": "llm_provider_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "LLM Provider ID",
+              "title": "Llm Provider Id"
+            },
+            "description": "LLM Provider ID"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search keyword",
+              "title": "Search"
+            },
+            "description": "Search keyword"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}": {
+      "get": {
+        "tags": ["Agents"],
+        "summary": "Get Agent Details",
+        "description": "Get Agent details.\n\nNo authentication required, but only the owner can view unpublished Agents.\n\nArgs:\n    agent_id: Agent ID\n    current_user: Current user (optional, via dependency injection)\n\nReturns:\n    Agent detail response\n\nRaises:\n    HTTPException: If Agent does not exist or no permission to access",
+        "operationId": "get_agent_api_v1_agents__agent_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Agents"],
+        "summary": "Update Agent",
+        "description": "Update Agent.\n\nRequires authentication, only the owner can update. Only updates the provided fields.\n\nArgs:\n    agent_id: Agent ID\n    request: Agent update request\n    current_user: Current user (via dependency injection)\n\nReturns:\n    Updated Agent details\n\nRaises:\n    HTTPException: If Agent does not exist, no permission, or update failed",
+        "operationId": "update_agent_api_v1_agents__agent_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Agents"],
+        "summary": "Delete Agent",
+        "description": "Delete Agent.\n\nRequires authentication, only the owner can delete.\n\nArgs:\n    agent_id: Agent ID\n    current_user: Current user (via dependency injection)\n\nRaises:\n    HTTPException: If Agent does not exist or no permission",
+        "operationId": "delete_agent_api_v1_agents__agent_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/publish": {
+      "post": {
+        "tags": ["Agents"],
+        "summary": "Publish Agent to Chain",
+        "description": "Publish Agent to chain.\n\nRequires authentication, only the owner can publish. Creates an async publish task and returns task ID.\n\nArgs:\n    agent_id: Agent ID\n    request: Publish request (includes force parameter)\n    current_user: Current user (via dependency injection)\n\nReturns:\n    Publish task details\n\nRaises:\n    HTTPException: If Agent does not exist, no permission, or task creation failed",
+        "operationId": "publish_agent_api_v1_agents__agent_id__publish_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentPublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPublishJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/publish-jobs/{job_id}": {
+      "get": {
+        "tags": ["Agents"],
+        "summary": "Query Publish Task Status",
+        "description": "Query Agent publish task status.\n\nUsed to poll publish progress.\n\nArgs:\n    agent_id: Agent ID\n    job_id: Task ID\n    current_user: Current user (optional, via dependency injection)\n\nReturns:\n    Publish task details\n\nRaises:\n    HTTPException: If task does not exist or Agent ID does not match",
+        "operationId": "get_publish_job_api_v1_agents__agent_id__publish_jobs__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPublishJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/runs": {
+      "post": {
+        "tags": ["Agent Runs"],
+        "summary": "Execute Agent",
+        "description": "Initiate Agent run.\n\nRequires authentication. Creates run instance and triggers async task.\n\n**Payment Flow**:\n1. First call: If Agent requires payment, creates run record and returns 402 status with payment requirements\n2. Second call: With X-PAYMENT header, verifies payment then triggers run task\n\nArgs:\n    agent_id: Agent ID\n    request_body: run request (contains input data)\n    fastapi_request: FastAPI Request object\n    current_user: current user (via dependency injection)\n    x_payment: X-PAYMENT header (optional, provided on second request)\n\nReturns:\n    - 202: AgentRunResponse - run created\n    - 402: PaymentRequiredResponse - payment required\n\nRaises:\n    HTTPException: if Agent doesn't exist or operation fails",
+        "operationId": "create_agent_run_api_v1_agents__agent_id__runs_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "X-PAYMENT",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Payment"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AgentRunResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PaymentRequiredResponse"
+                    }
+                  ],
+                  "title": "Response Create Agent Run Api V1 Agents  Agent Id  Runs Post"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Agent run created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRequiredResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/runs/{run_id}": {
+      "get": {
+        "tags": ["Agent Runs"],
+        "summary": "Query Agent run status",
+        "description": "Query Agent run status.\n\nUsed for polling run progress. Requires authentication, can only query own runs.\n\nArgs:\n    agent_id: Agent ID\n    run_id: run ID\n    current_user: current user (via dependency injection)\n\nReturns:\n    run details (including event list)\n\nRaises:\n    HTTPException: if run doesn't exist or no permission",
+        "operationId": "get_agent_run_api_v1_agents__agent_id__runs__run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/feedback": {
+      "post": {
+        "tags": ["Agent Feedback"],
+        "summary": "Submit/revoke/respond to feedback",
+        "description": "Submit, revoke, or append response to feedback.\n\nCurrently only supports the respond operation; for submit/revoke use the auth + receipts flow.\n\nAuthentication required. Only published Agents can accept feedback.\n\nArgs:\n    agent_id: Agent ID\n    request: Feedback request\n    current_user: Current user (via dependency injection)\n\nReturns:\n    Feedback job response (task will be processed asynchronously)\n\nRaises:\n    HTTPException: If Agent does not exist, is not published, or user lacks permission",
+        "operationId": "submit_feedback_api_v1_agents__agent_id__feedback_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentFeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentFeedbackJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Agent Feedback"],
+        "summary": "Query feedback list",
+        "description": "Query feedback list for Agent.\n\nSupports pagination and operation type filtering. No authentication required, everyone can view feedback.\n\nArgs:\n    agent_id: Agent ID\n    pagination: Pagination parameters\n    operation: Operation type filter (optional)\n\nReturns:\n    Feedback list response",
+        "operationId": "list_feedbacks_api_v1_agents__agent_id__feedback_get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "operation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FeedbackOperation"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Operation type filter",
+              "title": "Operation"
+            },
+            "description": "Operation type filter"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentFeedbackListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/feedback/auth": {
+      "post": {
+        "tags": ["Agent Feedback"],
+        "summary": "Generate feedback authorization",
+        "description": "Generate feedback authorization signature.",
+        "operationId": "create_feedback_auth_api_v1_agents__agent_id__feedback_auth_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackAuthRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentFeedbackJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/feedback/receipts": {
+      "post": {
+        "tags": ["Agent Feedback"],
+        "summary": "Sync on-chain feedback receipt",
+        "description": "Submit feedback receipt signed by client.",
+        "operationId": "submit_feedback_receipt_api_v1_agents__agent_id__feedback_receipts_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackReceiptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentFeedbackJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/feedback/jobs/{job_id}": {
+      "get": {
+        "tags": ["Agent Feedback"],
+        "summary": "Query feedback job status",
+        "description": "Query feedback job status.\n\nUsed by frontend to poll task progress. Authentication required, can only query own tasks or completed tasks.\n\nArgs:\n    agent_id: Agent ID (for path completeness, not actually used)\n    job_id: Task ID\n    current_user: Current user (via dependency injection)\n\nReturns:\n    Feedback job response\n\nRaises:\n    HTTPException: If task does not exist or no permission",
+        "operationId": "get_feedback_job_api_v1_agents__agent_id__feedback_jobs__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentFeedbackJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/agents": {
+      "get": {
+        "tags": ["User"],
+        "summary": "View My Agents",
+        "description": "List all Agents created by the current user.\n\nIncludes both published and unpublished Agents.\nRequires authentication.\n\nArgs:\n    current_user: Current user (via dependency injection)\n    pagination: Pagination parameters\n\nReturns:\n    Paginated list of Agents",
+        "operationId": "list_my_agents_api_v1_me_agents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/runs": {
+      "get": {
+        "tags": ["User"],
+        "summary": "View My Execution History",
+        "description": "View all Agent execution history initiated by the current user.\n\nReturns in descending order by creation time.\nRequires authentication.\n\nArgs:\n    current_user: Current user (via dependency injection)\n    pagination: Pagination parameters\n\nReturns:\n    Paginated list of execution history",
+        "operationId": "list_my_runs_api_v1_me_runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_AgentRunResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/llm-providers": {
+      "get": {
+        "tags": ["Configuration"],
+        "summary": "Query LLM Provider List",
+        "description": "Query available LLM Provider list.\n\nNo authentication required, returns all configured LLM Providers.\n\nReturns:\n    List of LLM Providers",
+        "operationId": "list_llm_providers_api_v1_config_llm_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LLMProviderResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Llm Providers Api V1 Config Llm Providers Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/data-sources": {
+      "get": {
+        "tags": ["Configuration"],
+        "summary": "Query DataSource List",
+        "description": "Query available DataSource list.\n\nNo authentication required, returns all configured DataSources.\n\nReturns:\n    List of DataSources",
+        "operationId": "list_data_sources_api_v1_config_data_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DataSourceResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Data Sources Api V1 Config Data Sources Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Root",
+        "description": "Root path health check.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health",
+        "description": "Health check endpoint.\n\nChecks the status of critical dependencies like database, Redis, Celery, etc.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 3,
+            "title": "Name",
+            "description": "Agent name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Agent description"
+          },
+          "llm_provider_id": {
+            "type": "string",
+            "title": "Llm Provider Id",
+            "description": "LLM Provider ID"
+          },
+          "data_source_id": {
+            "type": "string",
+            "title": "Data Source Id",
+            "description": "Data source ID"
+          },
+          "system_prompt": {
+            "type": "string",
+            "minLength": 1,
+            "title": "System Prompt",
+            "description": "System Prompt"
+          },
+          "user_prompt_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Prompt Template",
+            "description": "User input template"
+          },
+          "a2a_card_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "A2A Card Uri",
+            "description": "A2A Card IPFS URI"
+          },
+          "pricing_model": {
+            "$ref": "#/components/schemas/PricingModel",
+            "description": "Pricing model"
+          },
+          "price_amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Amount",
+            "description": "Price amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Currency"
+          },
+          "requires_user_input": {
+            "type": "boolean",
+            "title": "Requires User Input",
+            "description": "Whether user input is required",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "llm_provider_id",
+          "data_source_id",
+          "system_prompt",
+          "pricing_model"
+        ],
+        "title": "AgentCreateRequest",
+        "description": "Create Agent request.\n\nAttributes:\n    name: Agent name (3-160 characters)\n    description: Agent description (optional)\n    llm_provider_id: LLM Provider ID\n    data_source_id: Data source ID\n    system_prompt: System Prompt\n    user_prompt_template: User input template (optional)\n    a2a_card_uri: A2A Card IPFS URI (optional)\n    pricing_model: Pricing model (free/fixed/usage)\n    price_amount: Price amount (required when pricing_model is not free)\n    currency: Currency (required when pricing_model is not free)\n    requires_user_input: Whether user input is required"
+      },
+      "AgentDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Agent ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Agent name"
+          },
+          "owner_wallet": {
+            "type": "string",
+            "title": "Owner Wallet",
+            "description": "Owner wallet address"
+          },
+          "publisher_wallet_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher Wallet Address",
+            "description": "Publisher wallet address"
+          },
+          "is_published": {
+            "type": "boolean",
+            "title": "Is Published",
+            "description": "Whether published"
+          },
+          "pricing_model": {
+            "$ref": "#/components/schemas/PricingModel",
+            "description": "Pricing model"
+          },
+          "price_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Amount",
+            "description": "Price amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Currency"
+          },
+          "llm_provider_id": {
+            "type": "string",
+            "title": "Llm Provider Id",
+            "description": "LLM Provider ID"
+          },
+          "data_source_id": {
+            "type": "string",
+            "title": "Data Source Id",
+            "description": "Data source ID"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Agent description"
+          },
+          "metadata_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Uri",
+            "description": "Metadata IPFS URI"
+          },
+          "a2a_card_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "A2A Card Uri",
+            "description": "A2A Card IPFS URI"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt",
+            "description": "System Prompt"
+          },
+          "user_prompt_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Prompt Template",
+            "description": "User input template"
+          },
+          "onchain_agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onchain Agent Id",
+            "description": "On-chain Agent ID"
+          },
+          "onchain_owner_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onchain Owner Address",
+            "description": "On-chain owner address"
+          },
+          "registration_tx_hashes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Tx Hashes",
+            "description": "Registration transaction hash list"
+          },
+          "registration_tx_hashes_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Tx Hashes Url",
+            "description": "Registration transaction URL for the first hash"
+          },
+          "requires_user_input": {
+            "type": "boolean",
+            "title": "Requires User Input",
+            "description": "Whether user input is required"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Update time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "owner_wallet",
+          "is_published",
+          "pricing_model",
+          "llm_provider_id",
+          "data_source_id",
+          "created_at",
+          "system_prompt",
+          "requires_user_input",
+          "updated_at"
+        ],
+        "title": "AgentDetailResponse",
+        "description": "Agent detail response.\n\nInherits from AgentSummary, adding more detailed fields.\n\nAttributes:\n    description: Agent description\n    metadata_uri: Metadata IPFS URI\n    a2a_card_uri: A2A Card IPFS URI\n    system_prompt: System Prompt\n    user_prompt_template: User input template\n    onchain_agent_id: On-chain Agent ID\n    onchain_owner_address: On-chain owner address\n    registration_tx_hashes: Registration transaction hash list\n    registration_tx_hashes_url: Registration transaction URL for the first hash\n    requires_user_input: Whether user input is required\n    updated_at: Update time"
+      },
+      "AgentFeedbackJobResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Job ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id",
+            "description": "Agent ID"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Job status"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/FeedbackOperation",
+            "description": "Operation type"
+          },
+          "tx_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tx Hash",
+            "description": "Transaction hash"
+          },
+          "error_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Reason",
+            "description": "Failure reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Start time"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "Finish time"
+          },
+          "feedback_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback Index",
+            "description": "Feedback index (off-chain or on-chain)"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode",
+            "description": "Execution mode (onchain/offchain)"
+          },
+          "client_wallet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Wallet",
+            "description": "Client wallet address"
+          },
+          "feedback_auth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback Auth",
+            "description": "Feedback authorization signature (hex)"
+          },
+          "auth_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Expires At",
+            "description": "Authorization expiration time (UTC)"
+          }
+        },
+        "type": "object",
+        "required": ["id", "agent_id", "status", "operation", "created_at"],
+        "title": "AgentFeedbackJobResponse",
+        "description": "Feedback Job Response.\n\nUsed to return the status of asynchronous feedback tasks for frontend polling.\n\nAttributes:\n    id: Job ID\n    agent_id: Agent ID\n    status: Job status\n    operation: Operation type\n    tx_hash: Transaction hash\n    error_reason: Failure reason\n    created_at: Creation time\n    started_at: Start time\n    finished_at: Finish time"
+      },
+      "AgentFeedbackListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total record count"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Records per page"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "Current offset"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentFeedbackResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Feedback list"
+          }
+        },
+        "type": "object",
+        "required": ["total", "limit", "offset", "items"],
+        "title": "AgentFeedbackListResponse",
+        "description": "Feedback List Response.\n\nAttributes:\n    items: Feedback list\n    total: Total count\n    limit: Items per page\n    offset: Offset"
+      },
+      "AgentFeedbackRequest": {
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/FeedbackOperation",
+            "description": "Operation type"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload",
+            "description": "Feedback data payload"
+          },
+          "feedback_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback Index",
+            "description": "On-chain feedback index"
+          }
+        },
+        "type": "object",
+        "required": ["operation", "payload"],
+        "title": "AgentFeedbackRequest",
+        "description": "Feedback Operation Request.\n\nUsed to submit, revoke, or respond to feedback.\n\nAttributes:\n    operation: Operation type (submit/revoke/respond)\n    payload: Feedback data payload, including score, tags, context, etc.\n    feedback_index: On-chain feedback index (required for revoke/respond operations)"
+      },
+      "AgentFeedbackResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Feedback ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id",
+            "description": "Agent ID"
+          },
+          "feedback_index": {
+            "type": "integer",
+            "title": "Feedback Index",
+            "description": "On-chain feedback index"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/FeedbackOperation",
+            "description": "Operation type"
+          },
+          "requester_wallet": {
+            "type": "string",
+            "title": "Requester Wallet",
+            "description": "Requester wallet address"
+          },
+          "content": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Content",
+            "description": "Complete feedback JSON"
+          },
+          "tx_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tx Hash",
+            "description": "Transaction hash (empty in offchain mode)"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "feedback_index",
+          "operation",
+          "requester_wallet",
+          "content",
+          "created_at"
+        ],
+        "title": "AgentFeedbackResponse",
+        "description": "Feedback Response.\n\nAttributes:\n    id: Feedback ID\n    agent_id: Agent ID\n    feedback_index: On-chain feedback index\n    operation: Operation type\n    requester_wallet: Requester wallet address\n    content: Complete feedback JSON\n    tx_hash: Transaction hash (optional, empty in offchain mode)\n    created_at: Creation time"
+      },
+      "AgentListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total record count"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Records per page"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "Current offset"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSummary"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Agent list"
+          }
+        },
+        "type": "object",
+        "required": ["total", "limit", "offset", "items"],
+        "title": "AgentListResponse",
+        "description": "Agent list response (with pagination).\n\nAttributes:\n    total: Total record count\n    limit: Records per page\n    offset: Current offset\n    items: Agent list"
+      },
+      "AgentPublishJobResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Task ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id",
+            "description": "Agent ID"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Task status"
+          },
+          "tx_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tx Hash",
+            "description": "Transaction hash (deprecated)"
+          },
+          "tx_hashes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tx Hashes",
+            "description": "All transaction hash list"
+          },
+          "onchain_agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onchain Agent Id",
+            "description": "On-chain Agent ID"
+          },
+          "metadata_uri_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Uri Snapshot",
+            "description": "Metadata URI snapshot"
+          },
+          "error_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Reason",
+            "description": "Failure reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Start time"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "Completion time"
+          }
+        },
+        "type": "object",
+        "required": ["id", "agent_id", "status", "created_at"],
+        "title": "AgentPublishJobResponse",
+        "description": "Agent publish job response.\n\nUsed for polling publish job status.\n\nAttributes:\n    id: Task ID\n    agent_id: Agent ID\n    status: Task status (pending/running/succeeded/failed)\n    tx_hash: Transaction hash (deprecated, use tx_hashes)\n    tx_hashes: All transaction hash list\n    onchain_agent_id: On-chain Agent ID (available after success)\n    metadata_uri_snapshot: Metadata URI snapshot\n    error_reason: Failure reason (optional)\n    created_at: Creation time\n    started_at: Start time (optional)\n    finished_at: Completion time (optional)"
+      },
+      "AgentPublishRequest": {
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Whether to force republish",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "AgentPublishRequest",
+        "description": "Agent publish request.\n\nAttributes:\n    force: Whether to force republish (published Agents can be force updated)"
+      },
+      "AgentRunCreateRequest": {
+        "properties": {
+          "input_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Payload",
+            "description": "User input data"
+          },
+          "client_context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Context",
+            "description": "Client context"
+          }
+        },
+        "type": "object",
+        "title": "AgentRunCreateRequest",
+        "description": "Create Agent Execution Request.\n\nAttributes:\n    input_payload: User input data (JSON)\n    client_context: Client context information (optional)"
+      },
+      "AgentRunDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Execution ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id",
+            "description": "Agent ID"
+          },
+          "requester_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requester Id",
+            "description": "Requester ID"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentRunStatus",
+            "description": "Execution status"
+          },
+          "payment_status": {
+            "$ref": "#/components/schemas/PaymentStatus",
+            "description": "Payment status"
+          },
+          "input_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Payload",
+            "description": "Input data"
+          },
+          "output_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Payload",
+            "description": "Output result"
+          },
+          "error_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Reason",
+            "description": "Failure reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Start time"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "Completion time"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRunEventResponse"
+            },
+            "type": "array",
+            "title": "Events",
+            "description": "Execution event list"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "requester_id",
+          "status",
+          "payment_status",
+          "created_at"
+        ],
+        "title": "AgentRunDetailResponse",
+        "description": "Agent Execution Detail Response.\n\nExtends AgentRunResponse with event list.\n\nAttributes:\n    events: Execution event list"
+      },
+      "AgentRunEventResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Event ID"
+          },
+          "agent_run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Run Id",
+            "description": "Execution ID"
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/AgentRunEventType",
+            "description": "Event type"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload",
+            "description": "Event data"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          }
+        },
+        "type": "object",
+        "required": ["id", "agent_run_id", "event_type", "created_at"],
+        "title": "AgentRunEventResponse",
+        "description": "Agent Execution Event Response.\n\nAttributes:\n    id: Event ID\n    agent_run_id: Execution ID\n    event_type: Event type\n    payload: Event data\n    created_at: Creation time"
+      },
+      "AgentRunEventType": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "payment_required",
+          "payment_confirmed",
+          "datasource_fetch",
+          "inference_complete",
+          "error"
+        ],
+        "title": "AgentRunEventType",
+        "description": "Execution event type, used for frontend polling display."
+      },
+      "AgentRunResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Execution ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id",
+            "description": "Agent ID"
+          },
+          "requester_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requester Id",
+            "description": "Requester ID"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentRunStatus",
+            "description": "Execution status"
+          },
+          "payment_status": {
+            "$ref": "#/components/schemas/PaymentStatus",
+            "description": "Payment status"
+          },
+          "input_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Payload",
+            "description": "Input data"
+          },
+          "output_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Payload",
+            "description": "Output result"
+          },
+          "error_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Reason",
+            "description": "Failure reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Start time"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "Completion time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "requester_id",
+          "status",
+          "payment_status",
+          "created_at"
+        ],
+        "title": "AgentRunResponse",
+        "description": "Agent Execution Response.\n\nThis response is returned after payment is completed or when payment is not required.\n\nAttributes:\n    id: Execution ID\n    agent_id: Agent ID\n    requester_id: Requester ID\n    status: Execution status\n    payment_status: Payment status\n    input_payload: Input data\n    output_payload: Output result\n    error_reason: Failure reason\n    created_at: Creation time\n    started_at: Start time\n    finished_at: Completion time"
+      },
+      "AgentRunStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "paying",
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "title": "AgentRunStatus",
+        "description": "Agent execution lifecycle status."
+      },
+      "AgentSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Agent ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Agent name"
+          },
+          "owner_wallet": {
+            "type": "string",
+            "title": "Owner Wallet",
+            "description": "Owner wallet address"
+          },
+          "publisher_wallet_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher Wallet Address",
+            "description": "Publisher wallet address"
+          },
+          "is_published": {
+            "type": "boolean",
+            "title": "Is Published",
+            "description": "Whether published"
+          },
+          "pricing_model": {
+            "$ref": "#/components/schemas/PricingModel",
+            "description": "Pricing model"
+          },
+          "price_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Amount",
+            "description": "Price amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Currency"
+          },
+          "llm_provider_id": {
+            "type": "string",
+            "title": "Llm Provider Id",
+            "description": "LLM Provider ID"
+          },
+          "data_source_id": {
+            "type": "string",
+            "title": "Data Source Id",
+            "description": "Data source ID"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "owner_wallet",
+          "is_published",
+          "pricing_model",
+          "llm_provider_id",
+          "data_source_id",
+          "created_at"
+        ],
+        "title": "AgentSummary",
+        "description": "Agent summary information (for list display).\n\nAttributes:\n    id: Agent ID\n    name: Agent name\n    owner_wallet: Owner wallet address\n    publisher_wallet_address: Publisher wallet address (optional)\n    is_published: Whether published\n    pricing_model: Pricing model\n    price_amount: Price amount\n    currency: Currency\n    llm_provider_id: LLM Provider ID\n    data_source_id: Data source ID\n    created_at: Creation time"
+      },
+      "AgentUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Agent name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Agent description"
+          },
+          "llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider Id",
+            "description": "LLM Provider ID"
+          },
+          "data_source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Source Id",
+            "description": "Data source ID"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt",
+            "description": "System Prompt"
+          },
+          "user_prompt_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Prompt Template",
+            "description": "User input template"
+          },
+          "a2a_card_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "A2A Card Uri",
+            "description": "A2A Card IPFS URI"
+          },
+          "pricing_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PricingModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pricing model"
+          },
+          "price_amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Amount",
+            "description": "Price amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Currency"
+          },
+          "requires_user_input": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires User Input",
+            "description": "Whether user input is required"
+          }
+        },
+        "type": "object",
+        "title": "AgentUpdateRequest",
+        "description": "Update Agent request.\n\nAll fields are optional, only provided fields will be updated.\n\nAttributes:\n    name: Agent name\n    description: Agent description\n    llm_provider_id: LLM Provider ID\n    data_source_id: Data source ID\n    system_prompt: System Prompt\n    user_prompt_template: User input template\n    a2a_card_uri: A2A Card IPFS URI\n    pricing_model: Pricing model\n    price_amount: Price amount\n    currency: Currency\n    requires_user_input: Whether user input is required"
+      },
+      "AuthChallengeRequest": {
+        "properties": {
+          "wallet_address": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "title": "Wallet Address",
+            "description": "Wallet address",
+            "examples": ["0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"]
+          },
+          "chain_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "title": "Chain Id",
+            "description": "Chain ID",
+            "examples": [84532]
+          }
+        },
+        "type": "object",
+        "required": ["wallet_address", "chain_id"],
+        "title": "AuthChallengeRequest",
+        "description": "Authentication Challenge Request.\n\nClient initiates authentication challenge, server returns a nonce to be signed.\n\nAttributes:\n    wallet_address: Wallet address (42-character address starting with 0x)\n    chain_id: Chain ID (e.g., Base Sepolia is 84532)"
+      },
+      "AuthChallengeResponse": {
+        "properties": {
+          "nonce": {
+            "type": "string",
+            "title": "Nonce",
+            "description": "Random nonce"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In",
+            "description": "Expiration time (seconds)",
+            "examples": [300]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Complete message to be signed"
+          }
+        },
+        "type": "object",
+        "required": ["nonce", "expires_in", "message"],
+        "title": "AuthChallengeResponse",
+        "description": "Authentication Challenge Response.\n\nReturns a nonce to be signed and expiration time.\n\nAttributes:\n    nonce: Random nonce for replay attack prevention\n    expires_in: Expiration time (seconds)\n    message: Complete message to be signed"
+      },
+      "AuthLoginRequest": {
+        "properties": {
+          "wallet_address": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "title": "Wallet Address",
+            "description": "Wallet address",
+            "examples": ["0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"]
+          },
+          "chain_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "title": "Chain Id",
+            "description": "Chain ID",
+            "examples": [84532]
+          },
+          "signature": {
+            "type": "string",
+            "title": "Signature",
+            "description": "Signature (hex format)",
+            "examples": ["0x..."]
+          },
+          "nonce": {
+            "type": "string",
+            "title": "Nonce",
+            "description": "Previously obtained nonce"
+          }
+        },
+        "type": "object",
+        "required": ["wallet_address", "chain_id", "signature", "nonce"],
+        "title": "AuthLoginRequest",
+        "description": "Login Request.\n\nClient signs the challenge message using wallet private key and submits the signature for verification.\n\nAttributes:\n    wallet_address: Wallet address\n    chain_id: Chain ID\n    signature: Signature (hex format)\n    nonce: Previously obtained nonce"
+      },
+      "AuthLoginResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token",
+            "description": "JWT access token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "description": "Token type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In",
+            "description": "Token validity period (seconds)",
+            "examples": [86400]
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id",
+            "description": "User ID"
+          }
+        },
+        "type": "object",
+        "required": ["access_token", "expires_in", "user_id"],
+        "title": "AuthLoginResponse",
+        "description": "Login Response.\n\nReturns JWT access token and user information.\n\nAttributes:\n    access_token: JWT access token\n    token_type: Token type, fixed as \"bearer\"\n    expires_in: Token validity period (seconds)\n    user_id: User ID"
+      },
+      "DataSourceResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "DataSource ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Data source name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Data source type"
+          },
+          "input_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Description",
+            "description": "Input description"
+          },
+          "output_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Description",
+            "description": "Output description"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name", "type"],
+        "title": "DataSourceResponse",
+        "description": "DataSource response.\n\nAttributes:\n    id: DataSource ID\n    name: Data source name\n    type: Data source type\n    input_description: Input description\n    output_description: Output description"
+      },
+      "FeedbackAuthRequest": {
+        "properties": {
+          "client_wallet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Wallet",
+            "description": "Client wallet address (defaults to current user)"
+          },
+          "expiry_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry Hours",
+            "description": "Authorization validity period (hours)",
+            "default": 24
+          },
+          "max_index_hint": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Index Hint",
+            "description": "Optional feedback index upper limit hint"
+          }
+        },
+        "type": "object",
+        "title": "FeedbackAuthRequest",
+        "description": "Feedback Authorization Request."
+      },
+      "FeedbackOperation": {
+        "type": "string",
+        "enum": [
+          "submit",
+          "revoke",
+          "respond",
+          "sign_auth",
+          "sync_submit",
+          "sync_revoke"
+        ],
+        "title": "FeedbackOperation",
+        "description": "Feedback operation type."
+      },
+      "FeedbackReceiptRequest": {
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/FeedbackOperation",
+            "description": "Operation type (submit/revoke only)"
+          },
+          "client_wallet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Wallet",
+            "description": "Client wallet address (defaults to current user)"
+          },
+          "feedback_index": {
+            "type": "integer",
+            "title": "Feedback Index",
+            "description": "On-chain feedback index"
+          },
+          "tx_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tx Hash",
+            "description": "On-chain transaction hash (optional, for additional verification)"
+          },
+          "file_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Uri",
+            "description": "IPFS file URI"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload",
+            "description": "Payload when submitted on-chain (optional)"
+          },
+          "proof_of_payment": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proof Of Payment",
+            "description": "Proof of payment (optional)"
+          }
+        },
+        "type": "object",
+        "required": ["operation", "feedback_index"],
+        "title": "FeedbackReceiptRequest",
+        "description": "Client On-chain Feedback Receipt Request."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IDResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Resource ID"
+          }
+        },
+        "type": "object",
+        "required": ["id"],
+        "title": "IDResponse",
+        "description": "ID Response (for create operations).\n\nAttributes:\n    id: ID of the created resource"
+      },
+      "JobStatus": {
+        "type": "string",
+        "enum": ["pending", "running", "succeeded", "failed"],
+        "title": "JobStatus",
+        "description": "Asynchronous task status."
+      },
+      "LLMProviderResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Provider ID"
+          },
+          "vendor": {
+            "type": "string",
+            "title": "Vendor",
+            "description": "Vendor name"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "Model name"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens",
+            "description": "Maximum token count"
+          },
+          "rpm_limit": {
+            "type": "integer",
+            "title": "Rpm Limit",
+            "description": "Requests per minute limit"
+          }
+        },
+        "type": "object",
+        "required": ["id", "vendor", "model", "max_tokens", "rpm_limit"],
+        "title": "LLMProviderResponse",
+        "description": "LLM Provider response.\n\nAttributes:\n    id: Provider ID\n    vendor: Vendor name\n    model: Model name\n    max_tokens: Maximum token count\n    rpm_limit: Requests per minute limit"
+      },
+      "PaginatedResponse_AgentRunResponse_": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total record count"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Records per page"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "Current offset"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRunResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Data list"
+          }
+        },
+        "type": "object",
+        "required": ["total", "limit", "offset", "items"],
+        "title": "PaginatedResponse[AgentRunResponse]"
+      },
+      "PaymentRequiredResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Status: payment_required",
+            "default": "payment_required"
+          },
+          "agent_run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Run Id",
+            "description": "Created Agent Run ID"
+          },
+          "payment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Payment Id",
+            "description": "Payment record ID"
+          },
+          "x402_version": {
+            "type": "string",
+            "title": "X402 Version",
+            "description": "x402 protocol version"
+          },
+          "payment_requirements": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Payment Requirements",
+            "description": "Payment requirements list"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Error message",
+            "default": "Payment required"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_run_id",
+          "payment_id",
+          "x402_version",
+          "payment_requirements"
+        ],
+        "title": "PaymentRequiredResponse",
+        "description": "402 response returned when first call requires payment.\n\nThis response tells the client that payment is required to continue."
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": [
+          "none",
+          "required",
+          "pending_signature",
+          "pending",
+          "confirmed",
+          "failed"
+        ],
+        "title": "PaymentStatus",
+        "description": "x402 payment state machine.\n\nState transition description:\n- NONE: No payment required\n- REQUIRED: API returns 402, waiting for frontend to initiate signature\n- PENDING_SIGNATURE: User clicked payment but signature not completed\n- PENDING: Signature submitted, facilitator processing\n- CONFIRMED: Payment completed, can proceed to execution\n- FAILED: Payment failed or timed out"
+      },
+      "PricingModel": {
+        "type": "string",
+        "enum": ["free", "fixed", "usage"],
+        "title": "PricingModel",
+        "description": "Agent pricing model."
+      },
+      "UserProfileResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "User ID"
+          },
+          "wallet_address": {
+            "type": "string",
+            "title": "Wallet Address",
+            "description": "Wallet address"
+          },
+          "chain_id": {
+            "type": "integer",
+            "title": "Chain Id",
+            "description": "Chain ID"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "Display name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Email"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation time"
+          }
+        },
+        "type": "object",
+        "required": ["id", "wallet_address", "chain_id", "created_at"],
+        "title": "UserProfileResponse",
+        "description": "User Profile Response.\n\nReturns detailed information of the currently logged-in user.\n\nAttributes:\n    id: User ID\n    wallet_address: Wallet address\n    chain_id: Chain ID\n    display_name: Display name (optional)\n    email: Email (optional)\n    created_at: Creation time"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
